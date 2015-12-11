@@ -1,0 +1,32 @@
+load("./RvlmConstants.mac") $
+load("./RvlmHelpers.mac") $
+load("./RvlmCurvilinearDivRot.mac") $
+
+xs: [ x, q*z, z ] $
+ys: [ x, y/z, z ] $
+
+g[i,j] := kron_delta(i, j) $
+assume(z >= 0) $
+
+[div, rot]: curvilinearDivRot(xs, ys, [x, y, z], [x, q, z], g) $
+
+trigsimp(div) ;
+trigsimp(rot[1]) ;
+trigsimp(rot[2]) ;
+trigsimp(rot[3]) ;
+
+N: 3 $
+
+Maxwell: append(
+    makelist( ''rot[i](E) =  -mu*%mu0* 'diff(H[i], t), i, N),
+    makelist( ''rot[i](H) =  eps*%e0*  'diff(E[i], t) + sigma*E[i], i, 1, N)) ;
+
+Maxwell: ev(expand(Maxwell), E[1]=0, E[3]=0, H[2]=0, H[3]=0) $
+
+Maxwell: psubst([E[2] = E, H[1] = H], Maxwell);
+depends([E, H], [x, q, z]) $
+x;
+Maxwell: filter(Maxwell, lambda([x], if x then false else true)) $
+
+for i: 1 thru 2*N do
+    display(Maxwell[i]) $

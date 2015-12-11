@@ -1,0 +1,92 @@
+/* RvlmCurvilinearDivRot.mac
+   =========================
+
+   This script performs vector field divergence and curl calculation in
+   tridimentional skew-angular curvilinear coordinate system. It was originally
+   created while my PhD work at Voronezh State University to obtain Maxwell's
+   equations for a TEM-horn in a coordinate system of a special kind, but it
+   may be also useful for somebody else.
+
+   === How to use ===
+
+   First, make sure the script is located in a directory in 'file_search_maxima'
+   variable, or use full path. Then load the script and use it as in the
+   following simple example:
+
+       load(RvlmCurvilinearDivRot) $
+
+       xs: [ r*sin(%theta)*cos(%phi),
+             r*sin(%theta)*sin(%phi),
+             r*cos(%theta) ] $
+
+       ys: [ sqrt(x^2 + y^2 + z^2),
+             atan(sqrt(x^2 + y^2)/z),
+             atan(y/x) ] $
+
+       g[i,j] := kron_delta(i, j) $
+       assume(r >= 0, sin(%theta) >= 0) $
+
+       [div, rot]: curvilinearDivRot(xs, ys, [x, y, z], [r, %theta, %phi], g) $
+       "Some output follows, check out the IMPORTANT! lines." $
+
+       trigsimp(div) ;
+       trigsimp(rot[1]) ;
+       trigsimp(rot[2]) ;
+       trigsimp(rot[3]) ;
+
+   After that you can use 'div' and 'rot' functions. Note that another call to
+   'curvilinearDivRot' will generete another functions for you, so you can
+   easily work with a number of coordinate systems at once.
+
+   Copyright (c) Pavel Kretov, 2015.
+   This work is provided under the terms of Apache 2.0 license. */
+
+load("./RvlmHelpers.mac") $
+
+curvilinearDivRot(__xs, __ys, __x, __y, __g) := block(
+   /* This function must not use global variables or define global functions.
+      Here is the list of variables local to the block. */
+   [N, S, T, TY, Smatrix, TYmatrix, G, Gmatrix, K, W, div, rot],
+
+   /* The number of space dimentions. Changing this value would not magically
+      make the code work for every possible space, touch also Levi Chivita
+      computation code to make it happen. */
+   N: 3,
+
+   S[i,j] := diff(__xs[i], __y[j]),
+   T[i,j] := diff(__ys[i], __x[j]),
+
+   substXtoY: makelist(__x[i] = __xs[i], i, 1, N),
+   TY[i,j] := subst(substXtoY, T[i,j]),
+
+   G[i,j] := sum(sum( S[__k,i]*S[__m,j]*g[__k,__m], __k, 1, N), __m, 1, N),
+   Gmatrix: genmatrix(G, N, N),
+
+   K[k,i,j] := sum(TY[k,__q] * diff(S[__q,j], __y[i]), __q, 1, N),
+   W[i,j,k] := 1/sqrt(newdet(Gmatrix)) * LeviCivita3[i,j,k],
+
+   div[_](f) := sum(('diff(f[__i], __y[__i])
+                     + sum(K[__i,__i,__j] * f[j], __j, 1, N)), __i, 1, N),
+   rot[i](f) := sum(sum(sum(sum(
+     G[__r,i]*G[__q,__j]*W[i,__j,__k]*('diff(f[__k], __y[__q])
+     + sum(K[__k,__q,__m]*f[__m], __m, 1, N)),
+        __r, 1, N),
+	__j, 1, N),
+	__k, 1, N),
+	__q, 1, N),
+
+   Smatrix:  genmatrix(S, N, N),
+   TYmatrix: genmatrix(TY, N, N),
+   (print("IMPORTANT! The following expression must equal to identity matrix."),
+    display('(S . T) = ratsimp(trigsimp(Smatrix . TYmatrix)))),
+
+   for k: 1 thru N do
+   for i: 1 thru N do
+   for j: 1 thru N do
+       if trigsimp(ratsimp(K[k,i,j])) # 0
+       then display('K[k,i,j] = trigsimp(ratsimp(K[k,i,j]))),
+
+   display(div[1]),
+   display(rot[1]),
+   return(append(makelist(div[i], i, 1, 1),
+                [makelist(rot[i], i, 1, N)]))) $
